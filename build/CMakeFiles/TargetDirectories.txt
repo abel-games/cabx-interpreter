@@ -1,0 +1,3 @@
+/data/data/com.termux/files/home/storage/shared/Dev/cabx/build/CMakeFiles/cabx-interpreter.dir
+/data/data/com.termux/files/home/storage/shared/Dev/cabx/build/CMakeFiles/edit_cache.dir
+/data/data/com.termux/files/home/storage/shared/Dev/cabx/build/CMakeFiles/rebuild_cache.dir
