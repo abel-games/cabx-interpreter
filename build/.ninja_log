@@ -1,8 +1,0 @@
-# ninja log v7
-145	6693	1789282311067630512	CMakeFiles/cabx-interpreter.dir/src/main.cpp.o	ae3f16e922459752
-80	8024	1789282311055630512	CMakeFiles/cabx-interpreter.dir/src/Lexer.cpp.o	cd2a9cb9e67f2c57
-8027	8423	1789282318951630512	cabx-interpreter	85c59d5768823a75
-91	7432	1789282692303630535	CMakeFiles/cabx-interpreter.dir/src/Lexer.cpp.o	cd2a9cb9e67f2c57
-7440	7843	1789282699587630535	cabx-interpreter	85c59d5768823a75
-524	8128	1789307603401597739	CMakeFiles/cabx-interpreter.dir/src/Lexer.cpp.o	cd2a9cb9e67f2c57
-8137	8652	1789307610985597739	cabx-interpreter	85c59d5768823a75
