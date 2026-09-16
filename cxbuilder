@@ -1,0 +1,259 @@
+#!/data/data/com.alif.ide.cpp/files/usr/bin/bash
+
+source projectutils
+
+# ==============================
+# Opciones
+# ==============================
+
+while getopts ":hrsp:" opt; do
+	case $opt in
+		h)
+			help=true
+			;;
+		r)
+			run=true
+			;;
+		p)
+			print=true
+			;;
+		\?)
+			echo "Error: opción desconocida: -$OPTARG"
+			exit 1
+			;;
+	esac
+done
+
+shift $((OPTIND - 1))
+
+# ==============================
+# Ayuda
+# ==============================
+
+if [ -n "$help" ] || [ $# -eq 0 ]; then
+	echo "Construye un proyecto CMake."
+	echo
+	echo "Uso:"
+	echo "  cxbuilder -hrsp [PROJECT]"
+	echo
+	echo "Opciones:"
+	echo "  -h  Muestra esta ayuda"
+	echo "  -r  Ejecuta el programa después de compilar"
+	echo "  -p  Solo configura el proyecto"
+	exit 0
+fi
+
+# ==============================
+# Proyecto
+# ==============================
+
+project=$(getProjectRoot "$*")
+
+if [ -z "$project" ]; then
+	echo "Error: no se encontró el proyecto."
+	exit 1
+fi
+
+if [ ! -f "$project/CMakeLists.txt" ]; then
+	echo "Error: no existe CMakeLists.txt."
+	echo "Proyecto: $project"
+	exit 1
+fi
+
+build="$project/build"
+
+# ==============================
+# Comprobar CMake
+# ==============================
+
+if ! command -v cmake > /dev/null 2>&1; then
+	echo "Error: CMake no está disponible."
+	exit 1
+fi
+
+# ==============================
+# Preparar build
+# ==============================
+
+mkdir -p "$build"
+
+cmake_log="$build/cxbuilder_cmake.log"
+build_log="$build/cxbuilder_build.log"
+
+# ==============================
+# Configuración
+# ==============================
+
+echo "[1/2] Configurando..."
+
+if ! cmake -S "$project" -B "$build" > "$cmake_log" 2>&1; then
+	echo "Error: CMake no pudo configurar el proyecto."
+	echo
+	echo "Detalles:"
+	tail -n 8 "$cmake_log"
+	exit 1
+fi
+
+rm -f "$cmake_log"
+
+echo "      Configuración correcta."
+
+if [ -n "$print" ]; then
+	echo
+	echo "Configuración completada."
+	exit 0
+fi
+
+# ==============================
+# Compilación
+# ==============================
+
+echo "[2/2] Compilando..."
+
+if ! cmake --build "$build" > "$build_log" 2>&1; then
+	echo "Error: la compilación falló."
+	echo
+	echo "Detalles:"
+	tail -n 12 "$build_log"
+	exit 1
+fi
+
+rm -f "$build_log"
+
+echo "      Compilación correcta."
+echo "Done"
+
+# ==============================
+# Ejecutar
+# ==============================
+
+if [ -n "$run" ]; then
+
+	target=$(grep -E '^[[:space:]]*add_executable[[:space:]]*\(' \
+		"$project/CMakeLists.txt" \
+		| head -n 1 \
+		| sed -E 's/^[[:space:]]*add_executable[[:space:]]*\([[:space:]]*([^ )]+).*/\1/')
+
+	if [ -z "$target" ]; then
+		echo "Error: no se pudo encontrar el ejecutable."
+		exit 1
+	fi
+
+	program="$build/$target"
+
+	if [ ! -f "$program" ]; then
+		echo "Error: el ejecutable no existe:"
+		echo "$program"
+		exit 1
+	fi
+
+	# ==============================
+	# Crear copia temporal
+	# ==============================
+
+	temp=""
+
+	# Primera opción: HOME
+	if [ -n "$HOME" ] && [ -d "$HOME" ]; then
+		candidate="$HOME/.cxbuilder_$target"
+
+		if cp "$program" "$candidate" 2>/dev/null; then
+			temp="$candidate"
+		fi
+	fi
+
+	# Fallback: directorio actual
+	if [ -z "$temp" ]; then
+		candidate="./.cxbuilder_$target"
+
+		if cp "$program" "$candidate" 2>/dev/null; then
+			temp="$candidate"
+		fi
+	fi
+
+	# ==============================
+	# No se pudo crear copia
+	# ==============================
+
+	if [ -z "$temp" ]; then
+		echo "Error: no se pudo crear una copia temporal del ejecutable."
+		echo
+		echo "Se intentaron las siguientes ubicaciones:"
+		echo "  HOME: $HOME"
+		echo "  Directorio actual: $(pwd)"
+		exit 1
+	fi
+
+	# ==============================
+	# Limpieza automática
+	# ==============================
+
+	cleanup()
+	{
+		if [ -n "$temp" ] && [ -f "$temp" ]; then
+			rm -f "$temp"
+		fi
+	}
+
+	trap cleanup EXIT
+
+	# ==============================
+	# Permisos
+	# ==============================
+
+	if ! chmod +x "$temp" 2>/dev/null; then
+		echo "Error: no se pudieron establecer permisos de ejecución."
+		exit 1
+	fi
+
+	# ==============================
+	# Limpiar ELF si está disponible
+	# ==============================
+
+	if command -v termux-elf-cleaner > /dev/null 2>&1; then
+		termux-elf-cleaner \
+			--api-level "$API_LEVEL" \
+			"$temp" > /dev/null 2>&1 || true
+	fi
+
+	# ==============================
+	# Ejecutar
+	# ==============================
+
+	echo "Ejecutando $target..."
+	echo
+
+	appconsole "$temp"
+	exit_code=$?
+
+	# cleanup() se ejecuta automáticamente
+	# mediante trap EXIT.
+
+	exit "$exit_code"
+fi
+
+La parte importante
+
+Ahora "-r" hace:
+
+build/cabx-interpreter
+        │
+        ├── cp → $HOME/.cxbuilder_cabx-interpreter
+        │
+        ├── chmod +x
+        │
+        ├── ejecutar
+        │
+        └── rm
+
+Y si "$HOME" no funciona:
+
+$HOME
+  ↓ falla
+./.cxbuilder_cabx-interpreter
+  ↓ falla
+ERROR
+
+Además, el "trap" hace que incluso si el programa termina con error, la copia temporal se intente eliminar.
+
+Así el ejecutable de "build/" queda intacto para la siguiente ejecución.

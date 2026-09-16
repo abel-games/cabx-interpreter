@@ -7,6 +7,7 @@ enum TokenType {
 	UKNOWN,
 	IDENTIFIER,
 	VALUE,
+	STRING,
 	OPERATOR
 };
 
@@ -49,4 +50,5 @@ public:
 
 	void lex(const std::string& text);
 	void print();
+	void fix_types();
 };

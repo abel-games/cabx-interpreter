@@ -49,103 +49,115 @@ bool is_mergeable_op(const string& op)
 vector<Token> Lexer::tokenize(const string& text)
 {
 	bool in_quote = false;
+	bool is_escaped = false;
 	bool in_one_quote = false;
-	bool is_scaped = false;
+	char quote_type = '\0';
 
 	vector<string> total;
 	vector<TokenType> types;
+
 	string buffer;
 
 	for (char c : text)
 	{
-		if (is_scaped)
+		// ==============================
+		// Escape
+		// ==============================
+
+		if (is_escaped)
 		{
+			buffer += '\\';
 			buffer += c;
-			is_scaped = false;
+
+			is_escaped = false;
 			continue;
 		}
 
-		if (c == '\\')
+		if (c == '\\' && in_quote)
 		{
-			is_scaped = true;
+			is_escaped = true;
 			continue;
 		}
 
-		if (c == '"' && !in_one_quote)
-		{
-			in_quote = !in_quote;
-			continue;
-		}
+		// ==============================
+		// Dentro de string/char
+		// ==============================
 
-		if (c == '\'' && !in_quote)
+		if (in_quote)
 		{
-			in_one_quote = !in_one_quote;
-			continue;
-		}
+			if (c == quote_type)
+			{
+				in_quote = false;
 
-		if (in_quote || in_one_quote)
-		{
+				total.push_back(buffer);
+				types.push_back(STRING);
+
+				buffer.clear();
+				continue;
+			}
+
 			buffer += c;
 			continue;
 		}
+
+		// ==============================
+		// Inicio de string/char
+		// ==============================
+
+		if (c == '"' || c == '\'')
+		{
+			in_quote = true;
+			quote_type = c;
+
+			buffer.clear();
+			continue;
+		}
+
+		// ==============================
+		// Espacios
+		// ==============================
 
 		if (is_space(c))
 		{
 			if (!buffer.empty())
 			{
 				total.push_back(buffer);
+				types.push_back(IDENTIFIER);
 				buffer.clear();
-				if (in_quote || in_one_quote)
-				{
-					types.push_back(VALUE);
-				}
-				else
-				{
-					types.push_back(IDENTIFIER);
-				}
 			}
 
 			continue;
 		}
+
+		// ==============================
+		// Separadores
+		// ==============================
 
 		if (is_separator(c))
 		{
 			if (!buffer.empty())
 			{
 				total.push_back(buffer);
+				types.push_back(IDENTIFIER);
 				buffer.clear();
-				if (in_quote || in_one_quote)
-				{
-					types.push_back(VALUE);
-				}
-				else
-				{
-					types.push_back(IDENTIFIER);
-				}
 			}
 
-			buffer += c;
-			total.push_back(buffer);
-			buffer.clear();
+			total.push_back(string(1, c));
 			types.push_back(OPERATOR);
 
 			continue;
 		}
 
+		// ==============================
+		// Texto normal
+		// ==============================
+
 		buffer += c;
 	}
 
-	if (is_scaped)
-	{
-		std::cout << "Escapaste un caracter en blanco\n";
-		return vector<Token>();
-	}
-
-	if (in_quote || in_one_quote)
-	{
-		std::cout << "Comillas sin cerrar\n";
-		return vector<Token>();
-	}
+	// ==============================
+	// Buffer final
+	// ==============================
 
 	if (!buffer.empty())
 	{
@@ -153,20 +165,16 @@ vector<Token> Lexer::tokenize(const string& text)
 		types.push_back(IDENTIFIER);
 	}
 
-    #ifndef NDEBUG
-    	std::cout << "Aca ya termino el formado de tokens y sus tipos\n";
-    #endif
+	vector<Token> tokens;
 
-    vector<Token> result;
-    for (size_t i = 0; i < total.size(); i++)
-    {
-    	Token token(total[i]);
-    	token.set_type(types[i]);
+	for (size_t i = 0; i < total.size(); i++)
+	{
+		Token tk(total[i]);
+		tk.set_type(types[i]);
+		tokens.push_back(tk);
+	}
 
-    	result.push_back(token);
-    }
-
-    return result;
+	return tokens;
 }
 
 vector<Token> Lexer::merge_tokens(const vector<Token>& tokens)
@@ -176,18 +184,34 @@ vector<Token> Lexer::merge_tokens(const vector<Token>& tokens)
 	for (size_t i = 0; i < tokens.size(); i++)
 	{
 		const Token& current = tokens[i];
-		const string& atom = current.get_atom();
-		const TokenType type = current.get_type();
 
-		if (i + 1 < tokens.size())
+		if (
+			(current.get_atom() == "-" || current.get_atom() == "+") &&
+			i + 1 < tokens.size()
+		)
 		{
-			string combined = atom + tokens[i + 1].get_atom();
-			TokenType newt = tokens[i + 1].get_type();
-			
-			if (is_mergeable_op(combined))
+			const string& next = tokens[i + 1].get_atom();
+
+			bool valid_number_part = !next.empty();
+
+			for (char c : next)
 			{
-			    Token tk(combined);
-			    tk.set_type(newt);
+				if (
+					(c < '0' || c > '9') &&
+					c != '.' &&
+					c != '_'
+				)
+				{
+					valid_number_part = false;
+					break;
+				}
+			}
+
+			if (valid_number_part)
+			{
+				Token tk(current.get_atom() + next);
+				tk.set_type(IDENTIFIER);
+
 				merged_total.push_back(tk);
 				i++;
 				continue;
@@ -204,8 +228,60 @@ void Lexer::lex(const string& text)
 {
 	vector<Token> raw_tokens = tokenize(text);
 	vector<Token> merged_tokens = this->merge_tokens(raw_tokens);
-
 	this->tokens = merged_tokens;
+	this->fix_types();
+}
+
+bool is_number(const string& m)
+{
+	bool marked = false;
+	bool negative = false;
+	bool still_num = true;
+	for (size_t i = 0; i < m.size(); i++)
+	{
+		const char c = m[i];
+		if (i == 0)
+		{
+			if (c == '-')
+			{
+				negative = true;
+			}
+			if (c == '+')
+			{
+				negative = false;
+			}
+			marked = true;
+			continue;
+		}
+		if ((c >= '0' && c <= '9') || c == '.' || c == '_')
+		{
+			if (still_num)
+			{
+				still_num = true;
+			}
+			else
+			{
+				return false;
+			}
+		}
+		else
+		{
+			still_num = false;
+		}
+	}
+	return still_num;
+}
+
+void Lexer::fix_types()
+{
+	for (Token& tk : this->tokens)
+	{
+		const string& atom = tk.get_atom();
+		if (is_number(atom))
+		{
+			tk.set_type(VALUE);
+		}
+	}
 }
 
 void Lexer::print()
