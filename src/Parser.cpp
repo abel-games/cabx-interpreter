@@ -80,24 +80,24 @@ void Expression::print() const
 
 Expression* Expression::get_parent(Expression& root)
 {
-	for (const Expression* child : root.get_children())
+	for (const auto& child : root.get_children())
 	{
 		if (child.get() == this)
 		{
-			return root;
+			return &root;
 		}
-		else
+
+		Expression* result = get_parent(*child);
+
+		if (result != nullptr)
 		{
-			auto result = child->get_parent(root);
-			if (result != nullptr)
-			{
-				return result;
-			}
+			return result;
 		}
 	}
+
 	return nullptr;
 }
-				
+
 void Parser::make_ast(const vector<Token>& tks)
 {
 	Expression total("root");
@@ -112,7 +112,7 @@ void Parser::make_ast(const vector<Token>& tks)
 		(void)type;
  if (atom == ";")
 		{
-			actual=actual->get_parent(root);
+			actual=actual->get_parent(total);
 		}
 		if (Commands.contains(atom))
 		{
