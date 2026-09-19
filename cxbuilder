@@ -153,6 +153,7 @@ if [ -n "$run" ]; then
 
 	temp=""
 
+	# Primera opción: HOME
 	if [ -n "$HOME" ] && [ -d "$HOME" ]; then
 		candidate="$HOME/.cxbuilder_$target"
 
@@ -161,6 +162,7 @@ if [ -n "$run" ]; then
 		fi
 	fi
 
+	# Fallback: directorio actual
 	if [ -z "$temp" ]; then
 		candidate="./.cxbuilder_$target"
 
@@ -224,5 +226,34 @@ if [ -n "$run" ]; then
 	appconsole "$temp"
 	exit_code=$?
 
+	# cleanup() se ejecuta automáticamente
+	# mediante trap EXIT.
+
 	exit "$exit_code"
 fi
+
+La parte importante
+
+Ahora "-r" hace:
+
+build/cabx-interpreter
+        │
+        ├── cp → $HOME/.cxbuilder_cabx-interpreter
+        │
+        ├── chmod +x
+        │
+        ├── ejecutar
+        │
+        └── rm
+
+Y si "$HOME" no funciona:
+
+$HOME
+  ↓ falla
+./.cxbuilder_cabx-interpreter
+  ↓ falla
+ERROR
+
+Además, el "trap" hace que incluso si el programa termina con error, la copia temporal se intente eliminar.
+
+Así el ejecutable de "build/" queda intacto para la siguiente ejecución.
