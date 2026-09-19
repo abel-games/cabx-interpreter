@@ -113,6 +113,7 @@ void Parser::make_ast(const vector<Token>& tks)
  if (atom == ";")
 		{
 			actual=actual->get_parent(total);
+			continue;
 		}
 		if (Commands.contains(atom))
 		{

@@ -1,1 +1,0 @@
-/data/data/com.alif.ide.cpp/files/usr/bin/c++ -O2 -g -DNDEBUG -Xlinker --dependency-file=CMakeFiles/cabx-interpreter.dir/link.d "CMakeFiles/cabx-interpreter.dir/src/Lexer.cpp.o" "CMakeFiles/cabx-interpreter.dir/src/main.cpp.o" -o cabx-interpreter
